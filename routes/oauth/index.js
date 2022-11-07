@@ -18,6 +18,14 @@ export default fp(async function oauthAuthorize (fastify) {
 		sessionPlugin: '@fastify/session',
 	})
 
+	fastify.addHook('onRequest', async function (request) {
+		if (!this.config.TRUST_PROXY && request.protocol !== 'https') {
+			request.log.info({ protocol: request.protocol }, 'protocol not allowed')
+
+			throw this.httpErrors.notAcceptable()
+		}
+	})
+
 	// database plugin
 	const oidcdb = connect()
 	fastify.decorate('OIDCDB', oidcdb)

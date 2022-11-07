@@ -18,7 +18,8 @@ export default async function app (fastify, opts) {
 		schema: S.object()
 			.prop('NODE_ENV', S.string().default('production'))
 			.prop('PORT', S.number().default(3000))
-			.prop('SESSION_SECRET', S.array().default(['averylogphrasebiggerthanthirtytwochars']))
+			.prop('SESSION_SECRET', S.array().default(opts.SESSION_SECRET || ['averylogphrasebiggerthanthirtytwochars']))
+			.prop('TRUST_PROXY', S.boolean().default(opts.TRUST_PROXY || false))
 			.valueOf(),
 	})
 
