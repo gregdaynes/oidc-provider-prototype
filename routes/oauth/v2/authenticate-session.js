@@ -1,22 +1,14 @@
-import S from 'fluent-json-schema'
 import FormBody from '@fastify/formbody'
 import { sql } from '@databases/sqlite'
 import camelcaseKeys from 'camelcase-keys'
-import * as Err from './errors.js'
 
 export default async function authenticate (fastify) {
 	await fastify.register(FormBody)
 
 	await fastify.route({
-		method: 'POST',
+		method: 'GET',
 		url: '/authenticate',
-		preHandler: fastify.csrfProtection,
 		handler: onRequest,
-		schema: {
-			body: S.object()
-				.prop('username', S.string().required())
-				.prop('password', S.string().required()),
-		},
 	})
 }
 
@@ -29,20 +21,10 @@ async function onRequest (request, reply) {
 		client: request.session.client,
 
 		csrfToken: reply.generateCsrf(),
-
-		attributes: {
-			username: request.body.username,
-			password: request.body.password,
-		},
 	}
 
 	try {
-		await fetchAccountByUsername(ctx)
-		ensureAccountCredentialsMatch(ctx)
 		maybeRenderGrantForm(ctx)
-
-		request.session.user = ctx.account
-		request.session.user.isAuthenticated = true
 
 		if (ctx.response && ctx.response.type) {
 			reply.type(ctx.response.type)
@@ -59,32 +41,6 @@ async function onRequest (request, reply) {
 
 		throw new Error(err)
 	}
-}
-
-async function fetchAccountByUsername (ctx) {
-	const db = ctx.dbConnection
-	const username = ctx.attributes.username
-
-	const [account] = await db.query(sql`
-		SELECT *
-		FROM accounts
-		WHERE username = ${username}
-	`)
-
-	ctx.account = camelcaseKeys(account)
-
-	return ctx
-}
-
-function ensureAccountCredentialsMatch (ctx) {
-	const password = ctx.attributes.password
-	const accountPassword = ctx.account.password
-
-	if (accountPassword !== password) {
-		throw new Err.AccountCredentialsDoNotMatch()
-	}
-
-	return ctx
 }
 
 function maybeRenderGrantForm (ctx) {

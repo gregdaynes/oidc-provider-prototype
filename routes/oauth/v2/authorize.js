@@ -32,6 +32,7 @@ async function onRequest (request, reply) {
 		account: request.session.account,
 		oauth: request.session.oauth,
 		client: request.session.client,
+		user: request.session.user,
 
 		csrfToken: await reply.generateCsrf(),
 
@@ -53,7 +54,7 @@ async function onRequest (request, reply) {
 		await storeCodes(ctx)
 
 		maybeRenderAuthenticationForm(ctx)
-		// TODO maybe already authenticated
+		maybeAlreadyAuthenticated(ctx)
 		// TODO maybe already authorized
 
 		request.session.oauth = {
@@ -64,7 +65,11 @@ async function onRequest (request, reply) {
 		request.session.client = ctx.client
 		await reply.generateCsrf()
 
-		if (ctx.response && ctx.response.type) {
+		if (ctx.response && ctx.response.mode === 'redirect') {
+			return reply.redirect(ctx.response.payload)
+		}
+
+		if (ctx.response && ctx.response.mode === 'send') {
 			reply.type(ctx.response.type)
 			return reply.send(ctx.response.payload)
 		}
@@ -223,6 +228,7 @@ function maybeRenderAuthenticationForm (ctx) {
 
 	if (!user || !user.isAuthenticated || prompt === 'login') {
 		ctx.response = {
+			mode: 'send',
 			type: 'text/html; charset=UTF-8',
 			payload: `
 				<!doctype html>
@@ -231,8 +237,8 @@ function maybeRenderAuthenticationForm (ctx) {
 					<form method="post" action="/oauth/v2/authenticate">
 						<input type="text" name="username" placeholder="username" />
 						<input type="password" name="password" placeholder="password" />
-						<input type="text" name="_csrf" value="${csrfToken}" />
 						<button type="submit">Authenticate</button>
+						<input type="hidden" name="_csrf" value="${csrfToken}" />
 					</form>
 				</body>
 				</html>
@@ -241,4 +247,16 @@ function maybeRenderAuthenticationForm (ctx) {
 	}
 
 	return ctx
+}
+
+function maybeAlreadyAuthenticated (ctx) {
+	const user = ctx.user
+	const prompt = ctx.attributes.prompt
+
+	if (user && user.isAuthenticated && prompt !== 'login') {
+		ctx.response = {
+			mode: 'redirect',
+			payload: '/oauth/v2/authenticate',
+		}
+	}
 }

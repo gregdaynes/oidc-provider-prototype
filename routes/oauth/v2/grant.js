@@ -27,6 +27,7 @@ async function onRequest (request, reply) {
 		account: request.session.account,
 		oauth: request.session.oauth,
 		client: request.session.client,
+		user: request.session.user,
 
 		attributes: {
 			...request.body,
