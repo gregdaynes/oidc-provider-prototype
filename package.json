@@ -28,6 +28,7 @@
     "@fastify/swagger": "^8.1.0",
     "@fastify/swagger-ui": "^1.2.0",
     "@fastify/under-pressure": "^8.1.0",
+    "camelcase-keys": "^8.0.2",
     "fastify": "^4.9.2",
     "fastify-cli": "^5.5.1",
     "fastify-plugin": "^4.3.0",
