@@ -16,6 +16,9 @@ export default fp(async function oauthAuthorize (fastify) {
 
 	await fastify.register(CSRF, {
 		sessionPlugin: '@fastify/session',
+		getToken (req) {
+			return req.body && req.body._csrf
+		},
 	})
 
 	fastify.addHook('onRequest', async function (request) {

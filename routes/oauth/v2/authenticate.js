@@ -10,7 +10,7 @@ export default async function authenticate (fastify) {
 	await fastify.route({
 		method: 'POST',
 		url: '/authenticate',
-		onRequest: fastify.csrfProtection,
+		preHandler: fastify.csrfProtection,
 		handler: onRequest,
 		schema: {
 			body: S.object()
@@ -23,6 +23,8 @@ export default async function authenticate (fastify) {
 async function onRequest (request, reply) {
 	const ctx = {
 		dbConnection: this.OIDCDB,
+
+		csrfToken: reply.generateCsrf(),
 
 		attributes: {
 			username: request.body.username,
@@ -79,6 +81,8 @@ function ensureAccountCredentialsMatch (ctx) {
 }
 
 function maybeRenderGrantForm (ctx) {
+	const csrfToken = ctx.csrfToken
+
 	ctx.response = {
 		type: 'text/html; charset=UTF-8',
 		payload: `
@@ -89,6 +93,7 @@ function maybeRenderGrantForm (ctx) {
 						<p>Are you sure you want to grant --client name--, --scope-- privileges to your account?
 						<button type="submit" name="grant" value="decline">no</button>
 						<button type="submit" name="grant" value="accept">yes</button>
+						<input type="text" name="_csrf" value="${csrfToken}" />
 					</form>
 				</body>
 				</html>

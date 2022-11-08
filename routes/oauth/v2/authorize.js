@@ -33,6 +33,8 @@ async function onRequest (request, reply) {
 		oauth: request.session.oauth,
 		client: request.session.client,
 
+		csrfToken: await reply.generateCsrf(),
+
 		attributes: {
 			...camelcaseKeys(request.query),
 		},
@@ -60,6 +62,7 @@ async function onRequest (request, reply) {
 		}
 
 		request.session.client = ctx.client
+		await reply.generateCsrf()
 
 		if (ctx.response && ctx.response.type) {
 			reply.type(ctx.response.type)
@@ -203,7 +206,6 @@ async function storeCodes (ctx) {
 	const state = ctx.attributes.state
 	const callbackUrl = ctx.attributes.redirectUri
 	const grantType = 'authorization_code'
-	// TODO this needs to be an internal id
 	const clientId = ctx.client.id
 
 	await db.query(sql`
@@ -216,6 +218,7 @@ async function storeCodes (ctx) {
 
 function maybeRenderAuthenticationForm (ctx) {
 	const user = ctx.user
+	const csrfToken = ctx.csrfToken
 	const prompt = ctx.attributes.prompt
 
 	if (!user || !user.isAuthenticated || prompt === 'login') {
@@ -228,6 +231,7 @@ function maybeRenderAuthenticationForm (ctx) {
 					<form method="post" action="/oauth/v2/authenticate">
 						<input type="text" name="username" placeholder="username" />
 						<input type="password" name="password" placeholder="password" />
+						<input type="text" name="_csrf" value="${csrfToken}" />
 						<button type="submit">Authenticate</button>
 					</form>
 				</body>

@@ -11,7 +11,7 @@ export default async function grant (fastify) {
 	await fastify.route({
 		method: 'POST',
 		url: '/grant',
-		onRequest: fastify.csrfProtection,
+		preHandler: fastify.csrfProtection,
 		handler: onRequest,
 		schema: {
 			body: S.object()
