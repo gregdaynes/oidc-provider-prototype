@@ -2,6 +2,8 @@ import { sql } from '@databases/sqlite'
 import S from 'fluent-json-schema'
 import Formbody from '@fastify/formbody'
 import crypto from 'node:crypto'
+import camelcaseKeys from 'camelcase-keys'
+import * as Err from './errors.js'
 
 export default async function token (fastify) {
 	await fastify.register(Formbody)
@@ -23,40 +25,21 @@ export default async function token (fastify) {
 }
 
 async function onRequest (request) {
-	const {
-		code,
-		code_verifier: codeVerifier,
-	} = request.body
+	const ctx = {
+		dbConnection: this.OIDCDB,
+		grantTypes: this.config.GRANT_TYPES,
 
-	if (codeVerifier) {
-		let [{
-			code_challenge: codeChallenge,
-			alg,
-		}] = await this.OIDCDB.query(sql`
-			SELECT *
-			FROM oidc_code_challenges
-			WHERE code = ${code}
-		`)
-
-		// only support sha256
-		if (alg === 'S256') {
-			alg = 'sha256'
-		} else {
-			alg = 'sha256'
-		}
-
-		// compare the verifier by...
-		// compute verifier with base64(hash_alg(code_verifier))
-		// no match - tampered with
-		const calculatedCodeVerifier = crypto
-			.createHash(alg)
-			.update(codeVerifier)
-			.digest('base64url')
-
-		if (codeChallenge !== calculatedCodeVerifier) {
-			return this.httpErrors.notAcceptable()
-		}
+		attributes: {
+			...camelcaseKeys(request.body),
+		},
 	}
+
+	ensureGrantTypeIsValid(ctx)
+	await loadClientByRegisteredId(ctx)
+	ensureClientSecretMatches(ctx)
+	await loadPayloadFromExchangeByCode(ctx)
+	calculateHashFromCodeVerifier(ctx)
+	ensureCodeVerifierMatches(ctx)
 
 	return {
 		token_type: 'Bearer',
@@ -80,4 +63,94 @@ async function onRequest (request) {
 	//    "pwd"
 	//  ]
 	// }
+}
+
+function ensureGrantTypeIsValid (ctx) {
+	const grantTypes = ctx.grantTypes
+	const grantType = ctx.attributes.grantType
+
+	if (!grantTypes.includes(grantType)) {
+		throw new Err.GrantTypeNotValid()
+	}
+
+	return ctx
+}
+
+async function loadClientByRegisteredId (ctx) {
+	const db = ctx.dbConnection
+	const clientId = ctx.attributes.clientId
+
+	let [client] = await db.query(sql`
+		SELECT *
+		FROM oidc_clients
+		WHERE registered_id = ${clientId}
+	`)
+
+	if (!client) throw new Err.ClientNotFound()
+
+	client = camelcaseKeys(client)
+	client.callbackUrl = client.callbackUrl.split(',')
+	delete client.callbackUrl
+
+	ctx.client = client
+
+	return ctx
+}
+
+function ensureClientSecretMatches (ctx) {
+	const client = ctx.client
+	const secret = ctx.attributes.clientSecret
+
+	if (client.secret !== secret) {
+		throw new Err.ClientSecretNotValid()
+	}
+
+	return ctx
+}
+
+async function loadPayloadFromExchangeByCode (ctx) {
+	const db = ctx.dbConnection
+	const code = ctx.attributes.code
+	const grantType = ctx.attributes.grantType
+
+	const [payload] = await db.query(sql`
+		SELECT *
+		FROM oidc_exchange
+		WHERE code = ${code}
+			AND grant_type = ${grantType}
+	`)
+
+	if (!payload) throw new Err.ExchangePayloadNotFound()
+
+	ctx.payload = camelcaseKeys(payload)
+
+	return ctx
+}
+
+function calculateHashFromCodeVerifier (ctx) {
+	const challengeAlgorithm = ctx.attributes.challengeAlg
+	const codeVerifier = ctx.attributes.codeVerifier
+
+	if (challengeAlgorithm !== 'S256') {
+		ctx.calculateCodeVerifier = ctx.attributes.codeVerifier
+		return ctx
+	}
+
+	ctx.calculateCodeVerifier = crypto
+		.createHash(challengeAlgorithm)
+		.update(codeVerifier)
+		.digest('base64url')
+
+	return ctx
+}
+
+function ensureCodeVerifierMatches (ctx) {
+	const challenge = ctx.attributes.challenge
+	const calculatedCodeVerifier = ctx.calculatedCodeVerifier
+
+	if (challenge !== calculatedCodeVerifier) {
+		throw new Err.ExchangeCodeNotValid()
+	}
+
+	return ctx
 }

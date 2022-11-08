@@ -34,30 +34,54 @@ export default fp(async function oauthAuthorize (fastify) {
 	await oidcdb.query(sql`
 		CREATE TABLE IF NOT EXISTS oidc_clients
 		(
-			id TEXT NOT NULL,
+			id INTEGER NOT NULL
+				constraint oidc_clients_pk
+				primary key autoincrement,
+			registered_id TEXT NOT NULL,
 			secret TEXT NOT NULL,
 			name TEXT NOT NULL,
-			callback_url NOT NULL
+			callback_url TEXT NOT NULL,
+			pkce_enabled INTEGER NOT NULL DEFAULT 1
 		)
 	`)
 
 	await oidcdb.query(sql`
-		CREATE TABLE IF NOT EXISTS oidc_code_challenges
+		CREATE TABLE IF NOT EXISTS oidc_exchange
 		(
 			code TEXT NOT NULL,
-			code_challenge TEXT NOT NULL,
-			alg TEXT NOT NULL
+			state TEXT NOT NULL,
+			challenge TEXT NOT NULL,
+			challenge_alg TEXT NOT NULL,
+			client_id INTEGER NOT NULL,
+			callback_url TEXT NOT NULL,
+			grant_type TEXT NOT NULL
+		)
+	`)
+
+	await oidcdb.query(sql`
+		CREATE TABLE IF NOT EXISTS accounts
+		(
+			username TEXT NOT NULL,
+			password TEXT NOT NULL
 		)
 	`)
 
 	// seeds
-	const clientID = 'demo-web-client'
+	const clientId = 'test-client_123'
 	const clientSecret = '6koyn9KpRuofYt2U'
-	const clientName = 'OAuth Tools Demo Code Flow'
-	const clientCallbackURL = 'https://oauth.tools/callback/code'
+	const clientName = 'Test Code Flow'
+	const clientCallbackUrl = 'https://oauth.tools/callback/code,https://test.com/callback,https://example.com/callback'
 
 	await oidcdb.query(sql`
-		INSERT INTO oidc_clients (id, secret, name, callback_url)
-		VALUES (${clientID}, ${clientSecret}, ${clientName}, ${clientCallbackURL})
+		INSERT INTO oidc_clients (registered_id, secret, name, callback_url)
+		VALUES (${clientId}, ${clientSecret}, ${clientName}, ${clientCallbackUrl})
+	`)
+
+	const username = 'test'
+	const password = 'test'
+
+	await oidcdb.query(sql`
+		INSERT INTO accounts (username, password)
+		VALUES (${username}, ${password})
 	`)
 })

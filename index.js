@@ -20,6 +20,9 @@ export default async function app (fastify, opts) {
 			.prop('PORT', S.number().default(3000))
 			.prop('SESSION_SECRET', S.array().default(opts.SESSION_SECRET || ['averylogphrasebiggerthanthirtytwochars']))
 			.prop('TRUST_PROXY', S.boolean().default(opts.TRUST_PROXY || false))
+			.prop('RESPONSE_TYPES', S.array().default(opts.RESPONSE_TYPES || ['code']))
+			.prop('CODE_CHALLENGE_METHODS', S.array().default(opts.CODE_CHALLENGE_METHODS || ['S256']))
+			.prop('GRANT_TYPES', S.array().default(opts.GRANT_TYPES || ['authorization_code']))
 			.valueOf(),
 	})
 
@@ -45,5 +48,6 @@ export default async function app (fastify, opts) {
 		dir: join(import.meta.url, 'routes'),
 		dirNameRoutePrefix: true,
 		options: Object.assign({}, opts),
+		ignorePattern: /.*(test|spec|errors).js/,
 	})
 }
