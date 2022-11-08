@@ -47,6 +47,13 @@ export class CodeChallengeMethodNotAccepted extends Error {
 	}
 }
 
+export class AccountCredentialsDoNotMatch extends Error {
+	constructor (message) {
+		super(message)
+		this.name = 'ErrorAccountCredentialsDoNotMatch'
+	}
+}
+
 export class CodeNotValid extends Error {
 	constructor (message) {
 		super(message)
